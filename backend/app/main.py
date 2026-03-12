@@ -1,8 +1,11 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+
+from app.board_store import BoardStore
+from app.schemas import BoardModel
 
 PLACEHOLDER_PAGE = """\
 <!doctype html>
@@ -103,14 +106,36 @@ PLACEHOLDER_PAGE = """\
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_DIR.parent
 FRONTEND_EXPORT_DIR = REPO_ROOT / "frontend" / "out"
+DATABASE_PATH = REPO_ROOT / "backend" / "data" / "pm.sqlite3"
 
 
-def create_app(frontend_dir: Path | None = None) -> FastAPI:
+def create_app(
+    frontend_dir: Path | None = None,
+    db_path: Path | None = None,
+) -> FastAPI:
     app = FastAPI(title="PM MVP Backend")
+    board_store = BoardStore(db_path or DATABASE_PATH)
+
+    @app.on_event("startup")
+    async def initialize_database() -> None:
+        board_store.initialize()
 
     @app.get("/api/hello")
     async def hello() -> dict[str, str]:
         return {"message": "hello from fastapi"}
+
+    @app.get("/api/board", response_model=BoardModel)
+    async def get_board() -> BoardModel:
+        return BoardModel.model_validate(board_store.get_board())
+
+    @app.put("/api/board", response_model=BoardModel)
+    async def update_board(board: BoardModel) -> BoardModel:
+        try:
+            normalized_board = board.model_dump()
+            board_store.save_board(normalized_board)
+            return BoardModel.model_validate(normalized_board)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     resolved_frontend_dir = frontend_dir or FRONTEND_EXPORT_DIR
     if resolved_frontend_dir.exists():

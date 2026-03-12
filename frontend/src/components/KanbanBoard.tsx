@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,8 +16,6 @@ import { KanbanCardOverlay } from "@/components/KanbanCard";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-const BOARD_STORAGE_KEY = "pm-board-user";
-
 const findColumnId = (board: BoardData, itemId: string) => {
   if (board.columns.some((column) => column.id === itemId)) {
     return itemId;
@@ -28,26 +26,20 @@ const findColumnId = (board: BoardData, itemId: string) => {
 
 export const KanbanBoard = ({
   onLogout,
+  initialBoard = initialData,
+  onBoardChange,
+  isSaving = false,
+  saveError = null,
 }: {
   onLogout?: () => void;
+  initialBoard?: BoardData;
+  onBoardChange?: (board: BoardData) => void;
+  isSaving?: boolean;
+  saveError?: string | null;
 }) => {
-  const [board, setBoard] = useState<BoardData>(() => {
-    if (typeof window === "undefined") {
-      return initialData;
-    }
-
-    const storedBoard = window.localStorage.getItem(BOARD_STORAGE_KEY);
-    if (!storedBoard) {
-      return initialData;
-    }
-
-    try {
-      return JSON.parse(storedBoard) as BoardData;
-    } catch {
-      return initialData;
-    }
-  });
+  const [board, setBoard] = useState<BoardData>(() => initialBoard);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const skipNextPersistRef = useRef(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -58,8 +50,26 @@ export const KanbanBoard = ({
   const cardsById = useMemo(() => board.cards, [board.cards]);
 
   useEffect(() => {
-    window.localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(board));
-  }, [board]);
+    skipNextPersistRef.current = true;
+    setBoard(initialBoard);
+  }, [initialBoard]);
+
+  useEffect(() => {
+    if (!onBoardChange) {
+      return;
+    }
+
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onBoardChange(board);
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [board, onBoardChange]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -178,13 +188,28 @@ export const KanbanBoard = ({
           </div>
           {onLogout ? (
             <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--navy-dark)]"
-              >
-                Log out
-              </button>
+              <div className="flex items-center gap-3">
+                {saveError ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--secondary-purple)]">
+                    {saveError}
+                  </p>
+                ) : isSaving ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--gray-text)]">
+                    Saving...
+                  </p>
+                ) : (
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--gray-text)]">
+                    Saved
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--navy-dark)]"
+                >
+                  Log out
+                </button>
+              </div>
             </div>
           ) : null}
           <div className="flex flex-wrap items-center gap-4">

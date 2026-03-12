@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthShell } from "@/components/AuthShell";
+import { cloneBoardData, initialData } from "@/lib/kanban";
 
 const storage = new Map<string, string>();
+const fetchMock = vi.fn();
 
 Object.defineProperty(window, "localStorage", {
   value: {
@@ -17,6 +19,11 @@ Object.defineProperty(window, "localStorage", {
   configurable: true,
 });
 
+Object.defineProperty(globalThis, "fetch", {
+  value: fetchMock,
+  configurable: true,
+});
+
 const signIn = async (username: string, password: string) => {
   await userEvent.type(screen.getByLabelText("Username"), username);
   await userEvent.type(screen.getByLabelText("Password"), password);
@@ -26,6 +33,7 @@ const signIn = async (username: string, password: string) => {
 describe("AuthShell", () => {
   beforeEach(() => {
     storage.clear();
+    fetchMock.mockReset();
   });
 
   it("shows the login form when unauthenticated", () => {
@@ -47,6 +55,11 @@ describe("AuthShell", () => {
   });
 
   it("logs in with the demo credentials", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => cloneBoardData(initialData),
+    });
+
     render(<AuthShell />);
 
     await signIn("user", "password");
@@ -56,6 +69,11 @@ describe("AuthShell", () => {
   });
 
   it("logs out and returns to the login screen", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => cloneBoardData(initialData),
+    });
+
     render(<AuthShell />);
 
     await signIn("user", "password");
@@ -65,20 +83,16 @@ describe("AuthShell", () => {
     expect(window.localStorage.getItem("pm-authenticated")).toBeNull();
   });
 
-  it("keeps the board state after logout and login", async () => {
-    window.localStorage.setItem(
-      "pm-board-user",
-      JSON.stringify({
-        columns: [
-          { id: "col-backlog", title: "Saved Backlog", cardIds: [] },
-          { id: "col-discovery", title: "Discovery", cardIds: [] },
-          { id: "col-progress", title: "In Progress", cardIds: [] },
-          { id: "col-review", title: "Review", cardIds: [] },
-          { id: "col-done", title: "Done", cardIds: [] },
-        ],
-        cards: {},
-      })
-    );
+  it("reloads the saved board from the backend after logout and login", async () => {
+    const savedBoard = cloneBoardData(initialData);
+    savedBoard.columns[0] = {
+      ...savedBoard.columns[0],
+      title: "Saved Backlog",
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => savedBoard,
+    });
 
     render(<AuthShell />);
 
@@ -87,5 +101,21 @@ describe("AuthShell", () => {
     await signIn("user", "password");
 
     expect(screen.getByDisplayValue("Saved Backlog")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a retry state when the board load fails", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    });
+
+    render(<AuthShell />);
+
+    await signIn("user", "password");
+
+    expect(screen.getByRole("heading", { name: "Loading board" })).toBeInTheDocument();
+    expect(screen.getByText("Unable to load board.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 });

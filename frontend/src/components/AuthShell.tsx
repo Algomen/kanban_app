@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { type BoardData } from "@/lib/kanban";
 
 const AUTH_STORAGE_KEY = "pm-authenticated";
 const VALID_USERNAME = "user";
@@ -97,11 +98,42 @@ export const AuthShell = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [board, setBoard] = useState<BoardData | null>(null);
+  const [isBoardLoading, setIsBoardLoading] = useState(false);
+  const [boardErrorMessage, setBoardErrorMessage] = useState<string | null>(null);
+  const [isSavingBoard, setIsSavingBoard] = useState(false);
+
+  const loadBoard = async () => {
+    setIsBoardLoading(true);
+    setBoardErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/board");
+      if (!response.ok) {
+        throw new Error("Unable to load board.");
+      }
+
+      const nextBoard = (await response.json()) as BoardData;
+      setBoard(nextBoard);
+    } catch {
+      setBoardErrorMessage("Unable to load board.");
+    } finally {
+      setIsBoardLoading(false);
+    }
+  };
 
   useEffect(() => {
     setIsAuthenticated(window.localStorage.getItem(AUTH_STORAGE_KEY) === "true");
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated) {
+      return;
+    }
+
+    void loadBoard();
+  }, [isAuthenticated, isHydrated]);
 
   const handleLogin = (username: string, password: string) => {
     const isValid =
@@ -121,7 +153,37 @@ export const AuthShell = () => {
   const handleLogout = () => {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
     setErrorMessage(null);
+    setBoard(null);
+    setBoardErrorMessage(null);
+    setIsSavingBoard(false);
     setIsAuthenticated(false);
+  };
+
+  const handleBoardChange = async (nextBoard: BoardData) => {
+    setBoard(nextBoard);
+    setIsSavingBoard(true);
+    setBoardErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/board", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(nextBoard),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to save board.");
+      }
+
+      const persistedBoard = (await response.json()) as BoardData;
+      setBoard(persistedBoard);
+    } catch {
+      setBoardErrorMessage("Unable to save changes.");
+    } finally {
+      setIsSavingBoard(false);
+    }
   };
 
   if (!isHydrated) {
@@ -132,5 +194,44 @@ export const AuthShell = () => {
     return <LoginForm onSubmit={handleLogin} errorMessage={errorMessage} />;
   }
 
-  return <KanbanBoard onLogout={handleLogout} />;
+  if (isBoardLoading || !board) {
+    return (
+      <main className="relative mx-auto flex min-h-screen max-w-[1500px] items-center justify-center px-6 py-12">
+        <section className="rounded-[32px] border border-[var(--stroke)] bg-white/85 px-8 py-10 shadow-[var(--shadow)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
+            Project Management MVP
+          </p>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-[var(--navy-dark)]">
+            Loading board
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-[var(--gray-text)]">
+            {boardErrorMessage ?? "Fetching your latest board state from the backend."}
+          </p>
+          {boardErrorMessage ? (
+            <button
+              type="button"
+              onClick={() => {
+                void loadBoard();
+              }}
+              className="mt-6 rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition hover:brightness-110"
+            >
+              Retry
+            </button>
+          ) : null}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <KanbanBoard
+      initialBoard={board}
+      onBoardChange={(nextBoard) => {
+        void handleBoardChange(nextBoard);
+      }}
+      isSaving={isSavingBoard}
+      saveError={boardErrorMessage}
+      onLogout={handleLogout}
+    />
+  );
 };

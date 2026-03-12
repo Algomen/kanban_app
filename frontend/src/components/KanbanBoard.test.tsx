@@ -3,28 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { cloneBoardData, initialData } from "@/lib/kanban";
 
-const storage = new Map<string, string>();
-
-Object.defineProperty(window, "localStorage", {
-  value: {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      storage.set(key, value);
-    },
-    removeItem: (key: string) => {
-      storage.delete(key);
-    },
-  },
-  configurable: true,
-});
-
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
-  beforeEach(() => {
-    storage.clear();
-  });
-
   it("renders five columns", () => {
     render(<KanbanBoard />);
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
@@ -81,9 +62,8 @@ describe("KanbanBoard", () => {
       ...storedBoard.columns[0],
       title: "Saved Backlog",
     };
-    window.localStorage.setItem("pm-board-user", JSON.stringify(storedBoard));
 
-    render(<KanbanBoard />);
+    render(<KanbanBoard initialBoard={storedBoard} />);
 
     expect(screen.getByDisplayValue("Saved Backlog")).toBeInTheDocument();
   });
