@@ -4,8 +4,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.ai import AIClient, AIClientError, FoundryClient
 from app.board_store import BoardStore
-from app.schemas import BoardModel
+from app.config import ConfigurationError, FoundrySettings
+from app.schemas import AIConnectivityRequest, AIConnectivityResponse, BoardModel
 
 PLACEHOLDER_PAGE = """\
 <!doctype html>
@@ -112,6 +114,7 @@ DATABASE_PATH = REPO_ROOT / "backend" / "data" / "pm.sqlite3"
 def create_app(
     frontend_dir: Path | None = None,
     db_path: Path | None = None,
+    ai_client: AIClient | None = None,
 ) -> FastAPI:
     app = FastAPI(title="PM MVP Backend")
     board_store = BoardStore(db_path or DATABASE_PATH)
@@ -136,6 +139,19 @@ def create_app(
             return BoardModel.model_validate(normalized_board)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/ai/connectivity", response_model=AIConnectivityResponse)
+    async def test_ai_connectivity(
+        request: AIConnectivityRequest,
+    ) -> AIConnectivityResponse:
+        try:
+            resolved_ai_client = ai_client or FoundryClient(FoundrySettings.from_env())
+            result = await resolved_ai_client.test_connectivity(request.prompt)
+            return AIConnectivityResponse(model=result.model, output_text=result.output_text)
+        except ConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except AIClientError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     resolved_frontend_dir = frontend_dir or FRONTEND_EXPORT_DIR
     if resolved_frontend_dir.exists():

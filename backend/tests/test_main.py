@@ -3,7 +3,20 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.ai import AIClientError, AIConnectivityResult
 from app.main import create_app
+
+
+class FakeAIClient:
+    def __init__(self, result: AIConnectivityResult | None = None, error: Exception | None = None):
+        self._result = result
+        self._error = error
+
+    async def test_connectivity(self, prompt: str) -> AIConnectivityResult:
+        if self._error is not None:
+            raise self._error
+        assert self._result is not None
+        return self._result
 
 
 def test_index_serves_placeholder_html_without_frontend_export(tmp_path: Path) -> None:
@@ -100,3 +113,55 @@ def test_board_endpoint_rejects_invalid_payload(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_ai_connectivity_returns_model_output(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "pm.sqlite3",
+            ai_client=FakeAIClient(
+                result=AIConnectivityResult(model="gpt-5.3-chat", output_text="4")
+            ),
+        )
+    )
+
+    response = client.post("/api/ai/connectivity", json={"prompt": "2+2"})
+
+    assert response.status_code == 200
+    assert response.json() == {"model": "gpt-5.3-chat", "output_text": "4"}
+
+
+def test_ai_connectivity_returns_clear_error_when_config_missing(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AI_FOUNDRY_ENDPOINT", "")
+    monkeypatch.setenv("AI_FOUNDRY_KEY", "")
+    monkeypatch.setenv("AI_FOUNDRY_MODEL", "")
+
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "pm.sqlite3",
+        )
+    )
+
+    response = client.post("/api/ai/connectivity", json={"prompt": "2+2"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Missing required AI configuration: AI_FOUNDRY_ENDPOINT, AI_FOUNDRY_KEY, AI_FOUNDRY_MODEL."
+    }
+
+
+def test_ai_connectivity_returns_backend_error_when_foundry_call_fails(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "pm.sqlite3",
+            ai_client=FakeAIClient(error=AIClientError("AI Foundry request failed.")),
+        )
+    )
+
+    response = client.post("/api/ai/connectivity", json={"prompt": "2+2"})
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "AI Foundry request failed."}

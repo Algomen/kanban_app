@@ -30,3 +30,12 @@ class BoardModel(BaseModel):
                 seen_card_ids.add(card_id)
 
         return self
+
+
+class AIConnectivityRequest(BaseModel):
+    prompt: str = Field(default="What is 2+2? Reply with digits only.")
+
+
+class AIConnectivityResponse(BaseModel):
+    model: str
+    output_text: str

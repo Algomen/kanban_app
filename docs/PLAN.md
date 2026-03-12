@@ -5,7 +5,7 @@ This document is the execution plan for the Project Management MVP. It is intent
 Assumptions:
 - Parts 1 through 7 are complete as of the current repo state.
 - Local development should be optimized for the Docker/container flow.
-- AI integration will use OpenRouter with the `openai/gpt-oss-120b` model, matching [AGENTS.md](/Users/alvaro.gomezmendez/projects/pm/pm/AGENTS.md).
+- AI integration will use Foundry matching [AGENTS.md](/Users/alvaro.gomezmendez/projects/pm/pm/AGENTS.md).
 - The current `frontend/` app is the baseline UI to preserve and progressively integrate into the full stack app.
 
 Implemented design decisions so far:
@@ -181,9 +181,8 @@ Success criteria:
 ## Part 8: AI connectivity
 
 Checklist:
-- [ ] Add backend configuration loading for `OPENROUTER_API_KEY`.
-- [ ] Add a small OpenRouter client in the backend.
-- [ ] Configure the model as `openai/gpt-oss-120b`.
+- [ ] Add backend configuration loading for `AI_FOUNDRY_KEY`.
+- [ ] Add a small foundry client in the backend.
 - [ ] Add a simple backend route or internal check to test AI connectivity.
 - [ ] Keep secrets out of the frontend and out of logs.
 
@@ -193,7 +192,7 @@ Tests:
 - Manual verification that the backend returns the model response successfully.
 
 Success criteria:
-- The backend can successfully call OpenRouter with the configured model.
+- The backend can successfully call foundry with the configured model.
 - Missing or invalid credentials fail with a clear backend error.
 - AI connectivity is proven before any board-modifying AI logic is added.
 
