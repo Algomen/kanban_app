@@ -3,18 +3,25 @@
 This document is the execution plan for the Project Management MVP. It is intentionally detailed enough to guide implementation and testing, but stays focused on the agreed MVP scope.
 
 Assumptions:
-- The immediate goal is to approve this plan before implementation starts.
+- Parts 1 through 7 are complete as of the current repo state.
 - Local development should be optimized for the Docker/container flow.
 - AI integration will use OpenRouter with the `openai/gpt-oss-120b` model, matching [AGENTS.md](/Users/alvaro.gomezmendez/projects/pm/pm/AGENTS.md).
 - The current `frontend/` app is the baseline UI to preserve and progressively integrate into the full stack app.
 
+Implemented design decisions so far:
+- The frontend is statically exported by Next.js and served by FastAPI.
+- The MVP login is still frontend-only for now, using `localStorage` only for the auth flag.
+- Board persistence is now backend-backed through `/api/board`; browser `localStorage` is no longer the board source of truth.
+- SQLite stores one full board JSON document per user, matching the frontend `BoardData` shape.
+- The frontend debounces board saves to avoid excessive API calls during drag and inline editing.
+
 ## Part 1: Planning and frontend documentation
 
 Checklist:
-- [ ] Expand this plan into actionable substeps, tests, and success criteria.
-- [ ] Review the existing `frontend/` code to document structure, behavior, and test coverage.
-- [ ] Create `frontend/AGENTS.md` describing the current frontend app and constraints.
-- [ ] Pause for user approval before any implementation work begins.
+- [x] Expand this plan into actionable substeps, tests, and success criteria.
+- [x] Review the existing `frontend/` code to document structure, behavior, and test coverage.
+- [x] Create `frontend/AGENTS.md` describing the current frontend app and constraints.
+- [x] Pause for user approval before any implementation work begins.
 
 Tests:
 - Manual review of this document for scope alignment and sequencing.
@@ -28,14 +35,18 @@ Success criteria:
 ## Part 2: Scaffolding
 
 Checklist:
-- [ ] Create backend service structure in `backend/` using FastAPI.
-- [ ] Add Python project metadata and dependency management based on `uv`.
-- [ ] Add Dockerfile and any supporting container config required to build and run the app locally.
-- [ ] Add start/stop scripts for Mac, Linux, and Windows under `scripts/`.
-- [ ] Make the backend serve a minimal static page at `/`.
-- [ ] Add at least one simple API route, such as `/api/health` or `/api/hello`.
-- [ ] Ensure the container startup path is the primary local run path.
+- [x] Create backend service structure in `backend/` using FastAPI.
+- [x] Add Python project metadata and dependency management based on `uv`.
+- [x] Add Dockerfile and any supporting container config required to build and run the app locally.
+- [x] Add start/stop scripts for Mac, Linux, and Windows under `scripts/`.
+- [x] Make the backend serve a minimal static page at `/`.
+- [x] Add at least one simple API route, such as `/api/health` or `/api/hello`.
+- [x] Ensure the container startup path is the primary local run path.
 - [ ] Document the minimum run steps in a concise README section if needed.
+
+Implementation notes:
+- The simple scaffold route chosen was `GET /api/hello`.
+- The backend still keeps a placeholder HTML fallback for `/` when the frontend export is absent.
 
 Tests:
 - Backend unit test for the hello/health endpoint.
@@ -50,12 +61,16 @@ Success criteria:
 ## Part 3: Add in frontend
 
 Checklist:
-- [ ] Decide how the Next.js frontend will be built for delivery through the FastAPI app.
-- [ ] Add the frontend build step to the Docker flow.
-- [ ] Serve the built frontend from FastAPI at `/`.
-- [ ] Preserve the current Kanban demo behavior and styling.
-- [ ] Ensure static assets load correctly when served by the backend.
-- [ ] Keep the frontend test setup working after integration changes.
+- [x] Decide how the Next.js frontend will be built for delivery through the FastAPI app.
+- [x] Add the frontend build step to the Docker flow.
+- [x] Serve the built frontend from FastAPI at `/`.
+- [x] Preserve the current Kanban demo behavior and styling.
+- [x] Ensure static assets load correctly when served by the backend.
+- [x] Keep the frontend test setup working after integration changes.
+
+Implementation notes:
+- The chosen approach is static export via Next.js `output: "export"`.
+- FastAPI serves the exported frontend from `frontend/out`.
 
 Tests:
 - Existing frontend unit tests still pass.
@@ -70,12 +85,16 @@ Success criteria:
 ## Part 4: Fake sign-in experience
 
 Checklist:
-- [ ] Add a login screen shown before board access.
-- [ ] Implement dummy credential validation for `user` / `password`.
-- [ ] Choose the simplest session mechanism compatible with the later backend-backed flow.
-- [ ] Add logout behavior that clears the signed-in state.
-- [ ] Ensure direct access to the board requires authentication state.
-- [ ] Keep the UI simple and consistent with the current visual language.
+- [x] Add a login screen shown before board access.
+- [x] Implement dummy credential validation for `user` / `password`.
+- [x] Choose the simplest session mechanism compatible with the later backend-backed flow.
+- [x] Add logout behavior that clears the signed-in state.
+- [x] Ensure direct access to the board requires authentication state.
+- [x] Keep the UI simple and consistent with the current visual language.
+
+Implementation notes:
+- The current auth gate is frontend-only.
+- The auth flag is stored in `localStorage` and is intentionally temporary until backend auth exists.
 
 Tests:
 - Frontend tests for rendering the login form and validation messages.
@@ -90,11 +109,15 @@ Success criteria:
 ## Part 5: Database modeling
 
 Checklist:
-- [ ] Propose a SQLite schema that supports multiple users and one board per user for MVP.
-- [ ] Store board state as JSON, while keeping the schema open for future extension.
-- [ ] Decide how seeded/default board data is created for a new user.
-- [ ] Document the schema and reasoning in `docs/`.
-- [ ] Pause for user approval before implementing the persistent model.
+- [x] Propose a SQLite schema that supports multiple users and one board per user for MVP.
+- [x] Store board state as JSON, while keeping the schema open for future extension.
+- [x] Decide how seeded/default board data is created for a new user.
+- [x] Document the schema and reasoning in `docs/`.
+- [x] Pause for user approval before implementing the persistent model.
+
+Implementation notes:
+- The approved schema is documented in `docs/DATABASE.md`.
+- The chosen model is `users` + `boards`, with one JSON board document per user.
 
 Tests:
 - Schema review against MVP requirements.
@@ -108,13 +131,18 @@ Success criteria:
 ## Part 6: Backend board API
 
 Checklist:
-- [ ] Add SQLite access layer in the backend.
-- [ ] Create the database automatically if it does not exist.
-- [ ] Add backend logic to create/fetch the single board for the signed-in user.
-- [ ] Add API routes to read the board.
-- [ ] Add API routes to update the board.
-- [ ] Keep the API payload shape simple and close to the frontend board model.
-- [ ] Add input validation and clear error handling.
+- [x] Add SQLite access layer in the backend.
+- [x] Create the database automatically if it does not exist.
+- [x] Add backend logic to create/fetch the single board for the signed-in user.
+- [x] Add API routes to read the board.
+- [x] Add API routes to update the board.
+- [x] Keep the API payload shape simple and close to the frontend board model.
+- [x] Add input validation and clear error handling.
+
+Implementation notes:
+- The backend routes are `GET /api/board` and `PUT /api/board`.
+- The DB is seeded automatically for the hardcoded MVP user `user`.
+- Validation ensures card references exist and no card is present in multiple columns.
 
 Tests:
 - Backend unit tests for database initialization.
@@ -129,11 +157,16 @@ Success criteria:
 ## Part 7: Frontend and backend integration
 
 Checklist:
-- [ ] Replace in-memory board state initialization with backend fetch on load.
-- [ ] Persist column rename, card create, card edit, card delete, and drag/drop move via API.
-- [ ] Add loading and error handling that stays minimal.
-- [ ] Keep the existing interaction model intact.
-- [ ] Ensure refreshes show persisted board state.
+- [x] Replace in-memory board state initialization with backend fetch on load.
+- [x] Persist column rename, card create, card edit, card delete, and drag/drop move via API.
+- [x] Add loading and error handling that stays minimal.
+- [x] Keep the existing interaction model intact.
+- [x] Ensure refreshes show persisted board state.
+
+Implementation notes:
+- `AuthShell` loads the board from the backend after login.
+- `KanbanBoard` remains the interaction owner but now emits debounced board saves.
+- Save state is surfaced minimally in the board header as `Saved`, `Saving...`, or an error.
 
 Tests:
 - Frontend integration tests around data loading and persistence behavior.
