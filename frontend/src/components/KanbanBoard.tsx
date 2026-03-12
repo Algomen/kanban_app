@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -9,14 +9,44 @@ import {
   useSensors,
   closestCorners,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { KanbanCardOverlay } from "@/components/KanbanCard";
 import { KanbanColumn } from "@/components/KanbanColumn";
-import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
-  const [board, setBoard] = useState<BoardData>(() => initialData);
+const BOARD_STORAGE_KEY = "pm-board-user";
+
+const findColumnId = (board: BoardData, itemId: string) => {
+  if (board.columns.some((column) => column.id === itemId)) {
+    return itemId;
+  }
+
+  return board.columns.find((column) => column.cardIds.includes(itemId))?.id;
+};
+
+export const KanbanBoard = ({
+  onLogout,
+}: {
+  onLogout?: () => void;
+}) => {
+  const [board, setBoard] = useState<BoardData>(() => {
+    if (typeof window === "undefined") {
+      return initialData;
+    }
+
+    const storedBoard = window.localStorage.getItem(BOARD_STORAGE_KEY);
+    if (!storedBoard) {
+      return initialData;
+    }
+
+    try {
+      return JSON.parse(storedBoard) as BoardData;
+    } catch {
+      return initialData;
+    }
+  });
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -27,8 +57,34 @@ export const KanbanBoard = () => {
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
 
+  useEffect(() => {
+    window.localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(board));
+  }, [board]);
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setBoard((prev) => {
+      const activeColumnId = findColumnId(prev, active.id as string);
+      const overColumnId = findColumnId(prev, over.id as string);
+
+      if (!activeColumnId || !overColumnId || activeColumnId === overColumnId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        columns: moveCard(prev.columns, active.id as string, over.id as string),
+      };
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -120,6 +176,17 @@ export const KanbanBoard = () => {
               </p>
             </div>
           </div>
+          {onLogout ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--navy-dark)]"
+              >
+                Log out
+              </button>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-4">
             {board.columns.map((column) => (
               <div
@@ -137,6 +204,7 @@ export const KanbanBoard = () => {
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <section className="grid gap-6 lg:grid-cols-5">
@@ -153,8 +221,8 @@ export const KanbanBoard = () => {
           </section>
           <DragOverlay>
             {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
+              <div className="w-full max-w-[280px]">
+                <KanbanCardOverlay card={activeCard} />
               </div>
             ) : null}
           </DragOverlay>

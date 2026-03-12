@@ -15,6 +15,16 @@ export type BoardData = {
   cards: Record<string, Card>;
 };
 
+export const cloneBoardData = (board: BoardData): BoardData => ({
+  columns: board.columns.map((column) => ({
+    ...column,
+    cardIds: [...column.cardIds],
+  })),
+  cards: Object.fromEntries(
+    Object.entries(board.cards).map(([id, card]) => [id, { ...card }])
+  ),
+});
+
 export const initialData: BoardData = {
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },

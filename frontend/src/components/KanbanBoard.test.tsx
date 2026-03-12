@@ -1,10 +1,30 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { cloneBoardData, initialData } from "@/lib/kanban";
+
+const storage = new Map<string, string>();
+
+Object.defineProperty(window, "localStorage", {
+  value: {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      storage.set(key, value);
+    },
+    removeItem: (key: string) => {
+      storage.delete(key);
+    },
+  },
+  configurable: true,
+});
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
+  beforeEach(() => {
+    storage.clear();
+  });
+
   it("renders five columns", () => {
     render(<KanbanBoard />);
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
@@ -42,5 +62,29 @@ describe("KanbanBoard", () => {
     await userEvent.click(deleteButton);
 
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("keeps the empty column drop hint visible after its last card is removed", async () => {
+    render(<KanbanBoard />);
+    const reviewColumn = screen.getByTestId("column-col-review");
+
+    await userEvent.click(
+      within(reviewColumn).getByRole("button", { name: /delete qa micro-interactions/i })
+    );
+
+    expect(within(reviewColumn).getByText("Drop a card here")).toBeInTheDocument();
+  });
+
+  it("loads a saved board from localStorage", () => {
+    const storedBoard = cloneBoardData(initialData);
+    storedBoard.columns[0] = {
+      ...storedBoard.columns[0],
+      title: "Saved Backlog",
+    };
+    window.localStorage.setItem("pm-board-user", JSON.stringify(storedBoard));
+
+    render(<KanbanBoard />);
+
+    expect(screen.getByDisplayValue("Saved Backlog")).toBeInTheDocument();
   });
 });

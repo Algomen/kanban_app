@@ -1,0 +1,13 @@
+.git
+.gitignore
+.next
+.pytest_cache
+.venv
+__pycache__
+backend/.pytest_cache
+backend/.venv
+frontend/.next
+frontend/test-results
+frontend/node_modules
+node_modules
+docs

@@ -173,4 +173,7 @@ cython_debug/
 .pypirc
 
 .DS_Store
-
+frontend/.next/
+frontend/test-results/
+frontend/node_modules/
+node_modules/
