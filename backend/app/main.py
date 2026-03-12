@@ -7,7 +7,13 @@ from fastapi.staticfiles import StaticFiles
 from app.ai import AIClient, AIClientError, FoundryClient
 from app.board_store import BoardStore
 from app.config import ConfigurationError, FoundrySettings
-from app.schemas import AIConnectivityRequest, AIConnectivityResponse, BoardModel
+from app.schemas import (
+    AIChatRequest,
+    AIChatResponse,
+    AIConnectivityRequest,
+    AIConnectivityResponse,
+    BoardModel,
+)
 
 PLACEHOLDER_PAGE = """\
 <!doctype html>
@@ -151,6 +157,26 @@ def create_app(
         except ConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except AIClientError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/ai/board", response_model=AIChatResponse)
+    async def respond_about_board(request: AIChatRequest) -> AIChatResponse:
+        try:
+            resolved_ai_client = ai_client or FoundryClient(FoundrySettings.from_env())
+            result = await resolved_ai_client.respond_about_board(
+                board=request.board.model_dump(),
+                message=request.message,
+                history=request.history,
+            )
+            if result.board is not None:
+                board_store.save_board(result.board)
+            return AIChatResponse(
+                assistantMessage=result.assistant_message,
+                board=result.board,
+            )
+        except ConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (AIClientError, ValueError) as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     resolved_frontend_dir = frontend_dir or FRONTEND_EXPORT_DIR

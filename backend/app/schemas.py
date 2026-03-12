@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -39,3 +41,19 @@ class AIConnectivityRequest(BaseModel):
 class AIConnectivityResponse(BaseModel):
     model: str
     output_text: str
+
+
+class AIChatMessageModel(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    board: BoardModel
+    message: str
+    history: list[AIChatMessageModel] = Field(default_factory=list)
+
+
+class AIChatResponse(BaseModel):
+    assistantMessage: str
+    board: BoardModel | None = None
