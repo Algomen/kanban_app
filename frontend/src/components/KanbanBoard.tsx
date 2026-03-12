@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -30,16 +30,28 @@ export const KanbanBoard = ({
   onBoardChange,
   isSaving = false,
   saveError = null,
+  chatMessages = [],
+  isAiLoading = false,
+  aiError = null,
+  onAiSubmit,
 }: {
   onLogout?: () => void;
   initialBoard?: BoardData;
   onBoardChange?: (board: BoardData) => void;
   isSaving?: boolean;
   saveError?: string | null;
+  chatMessages?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
+  isAiLoading?: boolean;
+  aiError?: string | null;
+  onAiSubmit?: (message: string) => Promise<void> | void;
 }) => {
   const [board, setBoard] = useState<BoardData>(() => initialBoard);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const skipNextPersistRef = useRef(true);
+  const [chatInput, setChatInput] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -157,6 +169,18 @@ export const KanbanBoard = ({
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
+  const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = chatInput.trim();
+
+    if (!message || !onAiSubmit || isAiLoading) {
+      return;
+    }
+
+    setChatInput("");
+    await onAiSubmit(message);
+  };
+
   return (
     <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.25)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
@@ -225,33 +249,102 @@ export const KanbanBoard = ({
           </div>
         </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-full max-w-[280px]">
-                <KanbanCardOverlay card={activeCard} />
-              </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <section className="grid gap-6 lg:grid-cols-5">
+              {board.columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  onRename={handleRenameColumn}
+                  onAddCard={handleAddCard}
+                  onDeleteCard={handleDeleteCard}
+                />
+              ))}
+            </section>
+            <DragOverlay>
+              {activeCard ? (
+                <div className="w-full max-w-[280px]">
+                  <KanbanCardOverlay card={activeCard} />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+
+          <aside className="rounded-[32px] border border-[var(--stroke)] bg-white/80 p-6 shadow-[var(--shadow)] backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
+              AI Assistant
+            </p>
+            <h2 className="mt-3 font-display text-2xl font-semibold text-[var(--navy-dark)]">
+              Board chat
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[var(--gray-text)]">
+              Ask the assistant to summarize, create, edit, or move cards across the fixed columns.
+            </p>
+
+            <div className="mt-6 flex h-[420px] flex-col gap-3 overflow-y-auto rounded-[28px] border border-[var(--stroke)] bg-[var(--surface)] p-4">
+              {chatMessages.length === 0 ? (
+                <p className="text-sm leading-6 text-[var(--gray-text)]">
+                  No messages yet. Try “Move Align roadmap themes to Review.”
+                </p>
+              ) : (
+                chatMessages.map((message, index) => (
+                  <article
+                    key={`${message.role}-${index}`}
+                    className={
+                      message.role === "user"
+                        ? "ml-8 rounded-[24px] bg-[var(--secondary-purple)] px-4 py-3 text-sm text-white"
+                        : "mr-8 rounded-[24px] border border-[var(--stroke)] bg-white px-4 py-3 text-sm text-[var(--navy-dark)]"
+                    }
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-70">
+                      {message.role === "user" ? "You" : "Assistant"}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap leading-6">{message.content}</p>
+                  </article>
+                ))
+              )}
+              {isAiLoading ? (
+                <p className="mr-8 rounded-[24px] border border-[var(--stroke)] bg-white px-4 py-3 text-sm text-[var(--gray-text)]">
+                  Thinking...
+                </p>
+              ) : null}
+            </div>
+
+            {aiError ? (
+              <p className="mt-4 rounded-2xl border border-[rgba(117,57,145,0.18)] bg-[rgba(117,57,145,0.08)] px-4 py-3 text-sm text-[var(--secondary-purple)]">
+                {aiError}
+              </p>
             ) : null}
-          </DragOverlay>
-        </DndContext>
+
+            <form className="mt-4 space-y-3" onSubmit={handleChatSubmit}>
+              <label className="block">
+                <span className="sr-only">Message the AI assistant</span>
+                <textarea
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  className="min-h-28 w-full rounded-[24px] border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+                  placeholder="Ask the AI to update the board..."
+                  aria-label="Message the AI assistant"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isAiLoading || !chatInput.trim()}
+                className="w-full rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Send
+              </button>
+            </form>
+          </aside>
+        </div>
       </main>
     </div>
   );

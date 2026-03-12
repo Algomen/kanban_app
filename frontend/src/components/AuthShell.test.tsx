@@ -118,4 +118,70 @@ describe("AuthShell", () => {
     expect(screen.getByText("Unable to load board.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
+
+  it("shows AI responses without changing the board when the response is message-only", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => cloneBoardData(initialData),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          assistantMessage: "The board looks balanced.",
+          board: null,
+        }),
+      });
+
+    render(<AuthShell />);
+
+    await signIn("user", "password");
+    await userEvent.type(
+      screen.getByLabelText("Message the AI assistant"),
+      "Summarize the board"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("The board looks balanced.")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Backlog")).toBeInTheDocument();
+  });
+
+  it("applies AI board updates automatically", async () => {
+    const updatedBoard = cloneBoardData(initialData);
+    updatedBoard.columns[3] = {
+      ...updatedBoard.columns[3],
+      cardIds: ["card-6", "card-1"],
+    };
+    updatedBoard.columns[0] = {
+      ...updatedBoard.columns[0],
+      cardIds: ["card-2"],
+    };
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => cloneBoardData(initialData),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          assistantMessage: "Moved the card to Review.",
+          board: updatedBoard,
+        }),
+      });
+
+    render(<AuthShell />);
+
+    await signIn("user", "password");
+    await userEvent.type(
+      screen.getByLabelText("Message the AI assistant"),
+      "Move Align roadmap themes to Review"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Moved the card to Review.")).toBeInTheDocument();
+    expect(screen.getByTestId("column-col-review")).toHaveTextContent(
+      "Align roadmap themes"
+    );
+  });
 });

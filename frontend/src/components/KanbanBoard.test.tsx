@@ -67,4 +67,28 @@ describe("KanbanBoard", () => {
 
     expect(screen.getByDisplayValue("Saved Backlog")).toBeInTheDocument();
   });
+
+  it("renders AI chat messages and submits prompts", async () => {
+    const onAiSubmit = vi.fn();
+    render(
+      <KanbanBoard
+        chatMessages={[
+          { role: "user", content: "Move a card." },
+          { role: "assistant", content: "Moved it." },
+        ]}
+        onAiSubmit={onAiSubmit}
+      />
+    );
+
+    expect(screen.getByText("Move a card.")).toBeInTheDocument();
+    expect(screen.getByText("Moved it.")).toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByLabelText("Message the AI assistant"),
+      "Create a card"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(onAiSubmit).toHaveBeenCalledWith("Create a card");
+  });
 });

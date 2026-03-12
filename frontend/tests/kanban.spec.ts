@@ -46,3 +46,14 @@ test("moves a card between columns", async ({ page }) => {
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
 });
+
+test("uses the AI sidebar to update the board", async ({ page }) => {
+  await signIn(page);
+  await page
+    .getByLabel("Message the AI assistant")
+    .fill("Move Align roadmap themes to Review and reply briefly.");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(page.getByText('Moved "Align roadmap themes" to Review.')).toBeVisible();
+  await expect(page.getByTestId("column-col-review").getByTestId("card-card-1")).toBeVisible();
+});

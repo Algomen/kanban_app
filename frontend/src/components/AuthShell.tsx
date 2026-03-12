@@ -8,6 +8,16 @@ const AUTH_STORAGE_KEY = "pm-authenticated";
 const VALID_USERNAME = "user";
 const VALID_PASSWORD = "password";
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type AIResponse = {
+  assistantMessage: string;
+  board: BoardData | null;
+};
+
 const LoginForm = ({
   onSubmit,
   errorMessage,
@@ -102,6 +112,9 @@ export const AuthShell = () => {
   const [isBoardLoading, setIsBoardLoading] = useState(false);
   const [boardErrorMessage, setBoardErrorMessage] = useState<string | null>(null);
   const [isSavingBoard, setIsSavingBoard] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null);
 
   const loadBoard = async () => {
     setIsBoardLoading(true);
@@ -156,6 +169,9 @@ export const AuthShell = () => {
     setBoard(null);
     setBoardErrorMessage(null);
     setIsSavingBoard(false);
+    setChatMessages([]);
+    setIsAiLoading(false);
+    setAiErrorMessage(null);
     setIsAuthenticated(false);
   };
 
@@ -183,6 +199,48 @@ export const AuthShell = () => {
       setBoardErrorMessage("Unable to save changes.");
     } finally {
       setIsSavingBoard(false);
+    }
+  };
+
+  const handleAiSubmit = async (message: string) => {
+    if (!board) {
+      return;
+    }
+
+    const nextHistory = [...chatMessages, { role: "user" as const, content: message }];
+    setChatMessages(nextHistory);
+    setIsAiLoading(true);
+    setAiErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/ai/board", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          board,
+          message,
+          history: chatMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to reach the AI assistant.");
+      }
+
+      const aiResponse = (await response.json()) as AIResponse;
+      setChatMessages((currentMessages) => [
+        ...currentMessages,
+        { role: "assistant", content: aiResponse.assistantMessage },
+      ]);
+      if (aiResponse.board) {
+        setBoard(aiResponse.board);
+      }
+    } catch {
+      setAiErrorMessage("Unable to reach the AI assistant.");
+    } finally {
+      setIsAiLoading(false);
     }
   };
 
@@ -231,6 +289,12 @@ export const AuthShell = () => {
       }}
       isSaving={isSavingBoard}
       saveError={boardErrorMessage}
+      chatMessages={chatMessages}
+      isAiLoading={isAiLoading}
+      aiError={aiErrorMessage}
+      onAiSubmit={(message) => {
+        void handleAiSubmit(message);
+      }}
       onLogout={handleLogout}
     />
   );
