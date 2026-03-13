@@ -42,7 +42,7 @@ Checklist:
 - [x] Make the backend serve a minimal static page at `/`.
 - [x] Add at least one simple API route, such as `/api/health` or `/api/hello`.
 - [x] Ensure the container startup path is the primary local run path.
-- [ ] Document the minimum run steps in a concise README section if needed.
+- [x] Document the minimum run steps in a concise README section if needed.
 
 Implementation notes:
 - The simple scaffold route chosen was `GET /api/hello`.
@@ -181,10 +181,10 @@ Success criteria:
 ## Part 8: AI connectivity
 
 Checklist:
-- [ ] Add backend configuration loading for `AI_FOUNDRY_KEY`.
-- [ ] Add a small foundry client in the backend.
-- [ ] Add a simple backend route or internal check to test AI connectivity.
-- [ ] Keep secrets out of the frontend and out of logs.
+- [x] Add backend configuration loading for `AI_FOUNDRY_KEY`.
+- [x] Add a small foundry client in the backend.
+- [x] Add a simple backend route or internal check to test AI connectivity.
+- [x] Keep secrets out of the frontend and out of logs.
 
 Tests:
 - Backend test for missing API key handling.
@@ -199,12 +199,12 @@ Success criteria:
 ## Part 9: Structured AI board updates
 
 Checklist:
-- [ ] Define the request payload sent to the model: board JSON, user message, and conversation history.
-- [ ] Define the structured response schema: assistant reply plus optional board update.
-- [ ] Implement backend prompt construction with strict, minimal instructions.
-- [ ] Validate and parse the model response before applying any board updates.
-- [ ] Persist approved board updates through the same backend storage layer.
-- [ ] Return both the assistant message and any resulting board state to the frontend.
+- [x] Define the request payload sent to the model: board JSON, user message, and conversation history.
+- [x] Define the structured response schema: assistant reply plus optional board update.
+- [x] Implement backend prompt construction with strict, minimal instructions.
+- [x] Validate and parse the model response before applying any board updates.
+- [x] Persist approved board updates through the same backend storage layer.
+- [x] Return both the assistant message and any resulting board state to the frontend.
 
 Tests:
 - Backend tests for response parsing and schema validation.
@@ -219,12 +219,12 @@ Success criteria:
 ## Part 10: AI sidebar UI
 
 Checklist:
-- [ ] Add a sidebar chat interface to the frontend.
-- [ ] Show conversation history and pending/loading state.
-- [ ] Send user messages to the backend AI endpoint.
-- [ ] Update the visible board automatically when the AI response includes a board change.
-- [ ] Keep the sidebar visually aligned with the existing design system.
-- [ ] Ensure the board remains usable while the AI sidebar exists.
+- [x] Add a sidebar chat interface to the frontend.
+- [x] Show conversation history and pending/loading state.
+- [x] Send user messages to the backend AI endpoint.
+- [x] Update the visible board automatically when the AI response includes a board change.
+- [x] Keep the sidebar visually aligned with the existing design system.
+- [x] Ensure the board remains usable while the AI sidebar exists.
 
 Tests:
 - Frontend component tests for chat rendering and submit behavior.
