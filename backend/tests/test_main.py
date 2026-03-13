@@ -354,6 +354,84 @@ def test_parse_board_response_rejects_non_json_output() -> None:
         raise AssertionError("Expected AIClientError for invalid JSON output.")
 
 
+def test_ai_board_endpoint_rejects_message_too_long(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "data" / "pm.sqlite3",
+            ai_client=FakeAIClient(),
+        )
+    )
+
+    board = client.get("/api/board").json()
+    response = client.post(
+        "/api/ai/board",
+        json={
+            "board": board,
+            "message": "x" * 2001,
+            "history": [],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_ai_board_endpoint_accepts_message_at_max_length(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "data" / "pm.sqlite3",
+            ai_client=FakeAIClient(
+                board_result=AIBoardResult(
+                    model="gpt-5.3-chat",
+                    assistant_message="OK.",
+                    board=None,
+                )
+            ),
+        )
+    )
+
+    board = client.get("/api/board").json()
+    response = client.post(
+        "/api/ai/board",
+        json={
+            "board": board,
+            "message": "x" * 2000,
+            "history": [],
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_ai_board_endpoint_returns_graceful_message_on_parse_failure(tmp_path: Path) -> None:
+    """When the AI returns a response that cannot be parsed into a valid board,
+    the endpoint should return 200 with a helpful message rather than a 502."""
+    client = TestClient(
+        create_app(
+            frontend_dir=Path("/tmp/does-not-exist"),
+            db_path=tmp_path / "data" / "pm.sqlite3",
+            ai_client=FakeAIClient(
+                board_result=AIBoardResult(
+                    model="gpt-5.3-chat",
+                    assistant_message="I wasn't able to format a board update. Please try rephrasing your request.",
+                    board=None,
+                )
+            ),
+        )
+    )
+
+    board = client.get("/api/board").json()
+    response = client.post(
+        "/api/ai/board",
+        json={"board": board, "message": "Break things.", "history": []},
+    )
+
+    assert response.status_code == 200
+    assert "wasn't able to format" in response.json()["assistantMessage"]
+    assert response.json()["board"] is None
+
+
 def test_parse_board_response_rejects_invalid_board_schema() -> None:
     try:
         _parse_board_response(

@@ -176,6 +176,7 @@ export const AuthShell = () => {
   };
 
   const handleBoardChange = async (nextBoard: BoardData) => {
+    const prevBoard = board;
     setBoard(nextBoard);
     setIsSavingBoard(true);
     setBoardErrorMessage(null);
@@ -197,6 +198,7 @@ export const AuthShell = () => {
       setBoard(persistedBoard);
     } catch {
       setBoardErrorMessage("Unable to save changes.");
+      setBoard(prevBoard);
     } finally {
       setIsSavingBoard(false);
     }
@@ -292,9 +294,7 @@ export const AuthShell = () => {
       chatMessages={chatMessages}
       isAiLoading={isAiLoading}
       aiError={aiErrorMessage}
-      onAiSubmit={(message) => {
-        void handleAiSubmit(message);
-      }}
+      onAiSubmit={(message) => void handleAiSubmit(message)}
       onLogout={handleLogout}
     />
   );

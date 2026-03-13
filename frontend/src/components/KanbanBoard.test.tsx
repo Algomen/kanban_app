@@ -68,6 +68,26 @@ describe("KanbanBoard", () => {
     expect(screen.getByDisplayValue("Saved Backlog")).toBeInTheDocument();
   });
 
+  it("does not call onBoardChange when initialBoard prop is replaced by parent", async () => {
+    // Verifies the race-condition fix: when the parent updates initialBoard (e.g. after
+    // an AI response), the local board sync must NOT trigger a persist callback.
+    const onBoardChange = vi.fn();
+    const board1 = cloneBoardData(initialData);
+    const board2 = cloneBoardData(initialData);
+    board2.columns[0] = { ...board2.columns[0], title: "AI Updated" };
+
+    const { rerender } = render(
+      <KanbanBoard initialBoard={board1} onBoardChange={onBoardChange} />
+    );
+
+    rerender(<KanbanBoard initialBoard={board2} onBoardChange={onBoardChange} />);
+
+    // Wait longer than the 250ms debounce to be sure no save fires
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(onBoardChange).not.toHaveBeenCalled();
+  });
+
   it("renders AI chat messages and submits prompts", async () => {
     const onAiSubmit = vi.fn();
     render(

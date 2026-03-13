@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -24,6 +24,46 @@ const findColumnId = (board: BoardData, itemId: string) => {
   return board.columns.find((column) => column.cardIds.includes(itemId))?.id;
 };
 
+const ChatInput = memo(function ChatInput({
+  onSubmit,
+  isLoading = false,
+}: {
+  onSubmit?: (message: string) => void;
+  isLoading?: boolean;
+}) {
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = value.trim();
+    if (!message || !onSubmit || isLoading) return;
+    setValue("");
+    onSubmit(message);
+  };
+
+  return (
+    <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+      <label className="block">
+        <span className="sr-only">Message the AI assistant</span>
+        <textarea
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className="min-h-28 w-full rounded-[24px] border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+          placeholder="Ask the AI to update the board..."
+          aria-label="Message the AI assistant"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={isLoading || !value.trim()}
+        className="w-full rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Send
+      </button>
+    </form>
+  );
+});
+
 export const KanbanBoard = ({
   onLogout,
   initialBoard = initialData,
@@ -46,12 +86,15 @@ export const KanbanBoard = ({
   }>;
   isAiLoading?: boolean;
   aiError?: string | null;
-  onAiSubmit?: (message: string) => Promise<void> | void;
+  onAiSubmit?: (message: string) => void;
 }) => {
   const [board, setBoard] = useState<BoardData>(() => initialBoard);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
-  const skipNextPersistRef = useRef(true);
-  const [chatInput, setChatInput] = useState("");
+  // Holds the board reference that should not be persisted (set when a parent-driven
+  // update syncs initialBoard into local state). Using a reference comparison rather
+  // than a boolean avoids a race where a user drag that is batched with an AI update
+  // would be incorrectly skipped.
+  const skipBoardRef = useRef<BoardData | null>(initialBoard);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -62,7 +105,7 @@ export const KanbanBoard = ({
   const cardsById = useMemo(() => board.cards, [board.cards]);
 
   useEffect(() => {
-    skipNextPersistRef.current = true;
+    skipBoardRef.current = initialBoard;
     setBoard(initialBoard);
   }, [initialBoard]);
 
@@ -71,8 +114,8 @@ export const KanbanBoard = ({
       return;
     }
 
-    if (skipNextPersistRef.current) {
-      skipNextPersistRef.current = false;
+    if (skipBoardRef.current === board) {
+      skipBoardRef.current = null;
       return;
     }
 
@@ -168,18 +211,6 @@ export const KanbanBoard = ({
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
-
-  const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const message = chatInput.trim();
-
-    if (!message || !onAiSubmit || isAiLoading) {
-      return;
-    }
-
-    setChatInput("");
-    await onAiSubmit(message);
-  };
 
   return (
     <div className="relative overflow-hidden">
@@ -292,7 +323,7 @@ export const KanbanBoard = ({
             <div className="mt-6 flex h-[420px] flex-col gap-3 overflow-y-auto rounded-[28px] border border-[var(--stroke)] bg-[var(--surface)] p-4">
               {chatMessages.length === 0 ? (
                 <p className="text-sm leading-6 text-[var(--gray-text)]">
-                  No messages yet. Try “Move Align roadmap themes to Review.”
+                  No messages yet. Try "Move Align roadmap themes to Review."
                 </p>
               ) : (
                 chatMessages.map((message, index) => (
@@ -324,25 +355,7 @@ export const KanbanBoard = ({
               </p>
             ) : null}
 
-            <form className="mt-4 space-y-3" onSubmit={handleChatSubmit}>
-              <label className="block">
-                <span className="sr-only">Message the AI assistant</span>
-                <textarea
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  className="min-h-28 w-full rounded-[24px] border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
-                  placeholder="Ask the AI to update the board..."
-                  aria-label="Message the AI assistant"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={isAiLoading || !chatInput.trim()}
-                className="w-full rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Send
-              </button>
-            </form>
+            <ChatInput onSubmit={onAiSubmit} isLoading={isAiLoading} />
           </aside>
         </div>
       </main>

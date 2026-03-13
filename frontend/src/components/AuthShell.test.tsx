@@ -146,6 +146,29 @@ describe("AuthShell", () => {
     expect(screen.getByDisplayValue("Backlog")).toBeInTheDocument();
   });
 
+  it("shows an error when the AI call fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => cloneBoardData(initialData),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({}),
+      });
+
+    render(<AuthShell />);
+
+    await signIn("user", "password");
+    await userEvent.type(
+      screen.getByLabelText("Message the AI assistant"),
+      "Do something"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Unable to reach the AI assistant.")).toBeInTheDocument();
+  });
+
   it("applies AI board updates automatically", async () => {
     const updatedBoard = cloneBoardData(initialData);
     updatedBoard.columns[3] = {

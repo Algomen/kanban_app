@@ -64,7 +64,14 @@ class FoundryClient:
         if not output_text:
             raise AIClientError("AI Foundry response did not include output text.")
 
-        return _parse_board_response(self._settings.model, output_text)
+        try:
+            return _parse_board_response(self._settings.model, output_text)
+        except AIClientError:
+            return AIBoardResult(
+                model=self._settings.model,
+                assistant_message="I wasn't able to format a board update. Please try rephrasing your request.",
+                board=None,
+            )
 
     async def _send_prompt(self, prompt: str) -> str:
         payload = {
@@ -76,22 +83,23 @@ class FoundryClient:
             "content-type": "application/json",
         }
 
-        if self._http_client is not None:
-            response = await self._http_client.post(
-                self._settings.endpoint,
-                json=payload,
-                headers=headers,
-            )
-        else:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
+        try:
+            if self._http_client is not None:
+                response = await self._http_client.post(
                     self._settings.endpoint,
                     json=payload,
                     headers=headers,
                 )
-
-        try:
+            else:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        self._settings.endpoint,
+                        json=payload,
+                        headers=headers,
+                    )
             response.raise_for_status()
+        except httpx.TimeoutException as exc:
+            raise AIClientError("AI request timed out.") from exc
         except httpx.HTTPStatusError as exc:
             raise AIClientError("AI Foundry request failed.") from exc
 

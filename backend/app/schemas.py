@@ -50,7 +50,7 @@ class AIChatMessageModel(BaseModel):
 
 class AIChatRequest(BaseModel):
     board: BoardModel
-    message: str
+    message: str = Field(max_length=2000)
     history: list[AIChatMessageModel] = Field(default_factory=list)
 
 
